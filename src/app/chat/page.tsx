@@ -5,7 +5,7 @@ import { useMcpServers } from "@/components/tambo/mcp-config-modal";
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import Link from "next/link";
-import { Brain, ArrowLeft, Sparkles } from "lucide-react";
+import { Brain, ArrowLeft, Sparkles, AlertTriangle, Key } from "lucide-react";
 
 // Polyfill for crypto.randomUUID in non-secure HTTP contexts (e.g. local IP addresses)
 if (typeof window !== "undefined") {
@@ -30,12 +30,16 @@ if (typeof window !== "undefined") {
 }
 
 export default function ChatPage() {
-  // Load MCP server configurations
   const mcpServers = useMcpServers();
+  const rawKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY?.trim() || "";
+  const isApiKeyMissing = !rawKey || rawKey === "" || rawKey === "api-key-here";
+
+  // Provide fallback key to prevent TamboProvider header append crashes if unconfigured
+  const safeApiKey = isApiKeyMissing ? "missing-tambo-api-key" : rawKey;
 
   return (
     <TamboProvider
-      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY || ""}
+      apiKey={safeApiKey}
       components={components}
       tools={tools}
       tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
@@ -75,6 +79,30 @@ export default function ChatPage() {
             </div>
           </div>
         </header>
+
+        {/* API Key Missing Alert Banner on Vercel */}
+        {isApiKeyMissing && (
+          <div className="bg-amber-950/80 border-b border-amber-800/60 p-4 px-6 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md shrink-0 z-10">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <span className="font-bold text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY is Missing in Vercel:</span>
+                <p className="text-amber-200/80">
+                  Add <code className="bg-amber-900/60 px-1.5 py-0.5 rounded font-mono text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY</code> in Vercel Project Settings ➔ Environment Variables, then click <strong>Redeploy</strong>.
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://tambo.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold flex items-center gap-1.5 shrink-0 transition"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Get Free Key at Tambo.co</span>
+            </a>
+          </div>
+        )}
 
         {/* Chat Thread Container */}
         <div className="flex-1 overflow-hidden">

@@ -528,9 +528,16 @@ const MessageInputInternal = React.forwardRef<
         setImageError(null);
         
         const rawMsg = error instanceof Error ? error.message : String(error);
-        if (rawMsg.includes("JSON") || rawMsg.includes("chunk") || rawMsg.includes("Unexpected token")) {
+        if (
+          rawMsg.includes("JSON") ||
+          rawMsg.includes("chunk") ||
+          rawMsg.includes("Unexpected token") ||
+          rawMsg.includes("Headers") ||
+          rawMsg.includes("append") ||
+          rawMsg.includes("Invalid value")
+        ) {
           setSubmitError(
-            "API Key Error or Network Stream Interrupted. Please check your NEXT_PUBLIC_TAMBO_API_KEY in .env.local or obtain a new free key at https://tambo.co"
+            "Tambo API Key is missing or invalid in Vercel. Please add NEXT_PUBLIC_TAMBO_API_KEY under Vercel Project Settings -> Environment Variables and click Redeploy."
           );
         } else {
           setSubmitError(
