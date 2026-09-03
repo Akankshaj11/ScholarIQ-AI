@@ -3,6 +3,20 @@
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 
+// Defensive patch for window.Headers.prototype.append to prevent invalid value crashes in production browsers
+if (typeof window !== "undefined" && window.Headers) {
+  const originalAppend = window.Headers.prototype.append;
+  window.Headers.prototype.append = function (name: string, value: string) {
+    try {
+      const cleanValue = String(value ?? "").replace(/['"\r\n]/g, "").trim();
+      if (!cleanValue) return;
+      return originalAppend.call(this, name, cleanValue);
+    } catch (e) {
+      console.warn("Handled invalid header append:", name, e);
+    }
+  };
+}
+
 // Polyfill for crypto.randomUUID in non-secure HTTP contexts (e.g. accessing via local IP address)
 if (typeof window !== "undefined") {
   if (!window.crypto) {
@@ -25,12 +39,17 @@ if (typeof window !== "undefined") {
   }
 }
 
+export function sanitizeApiKey(key?: string): string {
+  if (!key) return "";
+  return key.replace(/['"\r\n]/g, "").trim();
+}
+
 export default function Providers({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY;
+  const apiKey = sanitizeApiKey(process.env.NEXT_PUBLIC_TAMBO_API_KEY);
 
   if (!apiKey) {
     return <>{children}</>;

@@ -7,6 +7,20 @@ import { TamboProvider } from "@tambo-ai/react";
 import Link from "next/link";
 import { Brain, ArrowLeft, Sparkles, AlertTriangle, Key } from "lucide-react";
 
+// Defensive patch for window.Headers.prototype.append to prevent invalid value crashes in production browsers
+if (typeof window !== "undefined" && window.Headers) {
+  const originalAppend = window.Headers.prototype.append;
+  window.Headers.prototype.append = function (name: string, value: string) {
+    try {
+      const cleanValue = String(value ?? "").replace(/['"\r\n]/g, "").trim();
+      if (!cleanValue) return;
+      return originalAppend.call(this, name, cleanValue);
+    } catch (e) {
+      console.warn("Handled invalid header append:", name, e);
+    }
+  };
+}
+
 // Polyfill for crypto.randomUUID in non-secure HTTP contexts (e.g. local IP addresses)
 if (typeof window !== "undefined") {
   if (!window.crypto) {
@@ -31,84 +45,89 @@ if (typeof window !== "undefined") {
 
 export default function ChatPage() {
   const mcpServers = useMcpServers();
-  const rawKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY?.trim() || "";
+  const rawKey = (process.env.NEXT_PUBLIC_TAMBO_API_KEY || "").replace(/['"\r\n]/g, "").trim();
   const isApiKeyMissing = !rawKey || rawKey === "" || rawKey === "api-key-here";
 
-  // Provide fallback key to prevent TamboProvider header append crashes if unconfigured
-  const safeApiKey = isApiKeyMissing ? "missing-tambo-api-key" : rawKey;
+  const content = (
+    <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
+      {/* Header Bar */}
+      <header className="px-6 py-3 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5 text-xs font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+
+          <div className="h-4 w-px bg-slate-800 mx-1" />
+
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg overflow-hidden shadow-md shadow-violet-500/20 border border-violet-500/30 shrink-0">
+              <img src="/scholariq_logo.png" alt="ScholarIQ AI Logo" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <h1 className="font-bold text-base tracking-tight leading-none text-white">
+                ScholarIQ <span className="text-violet-400">AI</span>
+              </h1>
+              <span className="text-[10px] text-slate-400 font-mono">Academic Agent</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-violet-950/70 border border-violet-800/60 text-xs text-violet-300">
+            <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
+            <span className="font-medium">ScholarIQ Agent Active</span>
+          </div>
+        </div>
+      </header>
+
+      {/* API Key Missing Alert Banner on Vercel */}
+      {isApiKeyMissing && (
+        <div className="bg-amber-950/90 border-b border-amber-800/60 p-4 px-6 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md shrink-0 z-10">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <span className="font-bold text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY is Missing on Vercel:</span>
+              <p className="text-amber-200/80">
+                Go to Vercel Settings ➔ Environment Variables ➔ Add <code className="bg-amber-900/60 px-1.5 py-0.5 rounded font-mono text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY</code> ➔ Click <strong>Redeploy</strong>.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://tambo.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold flex items-center gap-1.5 shrink-0 transition"
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>Get Free Key at Tambo.co</span>
+          </a>
+        </div>
+      )}
+
+      {/* Chat Thread Container */}
+      <div className="flex-1 overflow-hidden">
+        <MessageThreadFull className="max-w-4xl mx-auto h-full" />
+      </div>
+    </div>
+  );
+
+  if (isApiKeyMissing) {
+    return content;
+  }
 
   return (
     <TamboProvider
-      apiKey={safeApiKey}
+      apiKey={rawKey}
       components={components}
       tools={tools}
       tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
       mcpServers={mcpServers}
     >
-      <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
-        {/* Header Bar */}
-        <header className="px-6 py-3 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5 text-xs font-medium"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Home</span>
-            </Link>
-
-            <div className="h-4 w-px bg-slate-800 mx-1" />
-
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg overflow-hidden shadow-md shadow-violet-500/20 border border-violet-500/30 shrink-0">
-                <img src="/scholariq_logo.png" alt="ScholarIQ AI Logo" className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <h1 className="font-bold text-base tracking-tight leading-none text-white">
-                  ScholarIQ <span className="text-violet-400">AI</span>
-                </h1>
-                <span className="text-[10px] text-slate-400 font-mono">Academic Agent</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-violet-950/70 border border-violet-800/60 text-xs text-violet-300">
-              <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
-              <span className="font-medium">ScholarIQ Agent Active</span>
-            </div>
-          </div>
-        </header>
-
-        {/* API Key Missing Alert Banner on Vercel */}
-        {isApiKeyMissing && (
-          <div className="bg-amber-950/80 border-b border-amber-800/60 p-4 px-6 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md shrink-0 z-10">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-              <div>
-                <span className="font-bold text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY is Missing in Vercel:</span>
-                <p className="text-amber-200/80">
-                  Add <code className="bg-amber-900/60 px-1.5 py-0.5 rounded font-mono text-amber-300">NEXT_PUBLIC_TAMBO_API_KEY</code> in Vercel Project Settings ➔ Environment Variables, then click <strong>Redeploy</strong>.
-                </p>
-              </div>
-            </div>
-            <a
-              href="https://tambo.co"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold flex items-center gap-1.5 shrink-0 transition"
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>Get Free Key at Tambo.co</span>
-            </a>
-          </div>
-        )}
-
-        {/* Chat Thread Container */}
-        <div className="flex-1 overflow-hidden">
-          <MessageThreadFull className="max-w-4xl mx-auto h-full" />
-        </div>
-      </div>
+      {content}
     </TamboProvider>
   );
 }
